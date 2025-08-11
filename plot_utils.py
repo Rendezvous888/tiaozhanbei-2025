@@ -248,3 +248,127 @@ def add_grid(*args, **kwargs):
 def create_legend(*args, **kwargs):
     """创建图例的便捷函数"""
     return adaptive_plotter.create_legend(*args, **kwargs)
+
+# ==================== 中文字体支持 ====================
+
+def configure_chinese_fonts():
+    """配置中文字体支持"""
+    import matplotlib.font_manager as fm
+    import os
+    
+    # 根据操作系统选择合适的字体
+    if platform.system() == 'Windows':
+        # Windows 系统字体
+        font_names = ['Microsoft YaHei', 'SimHei', 'SimSun', 'KaiTi']
+    elif platform.system() == 'Darwin':  # macOS
+        font_names = ['PingFang SC', 'Hiragino Sans GB', 'STHeiti', 'Arial Unicode MS']
+    else:  # Linux
+        font_names = ['WenQuanYi Micro Hei', 'DejaVu Sans', 'Liberation Sans', 'Noto Sans CJK SC']
+    
+    # 尝试设置字体
+    font_set = False
+    for font_name in font_names:
+        try:
+            # 检查字体是否可用
+            font_path = fm.findfont(fm.FontProperties(family=font_name))
+            if os.path.exists(font_path) and font_path != plt.rcParams['font.sans-serif'][0]:
+                plt.rcParams['font.sans-serif'] = [font_name] + plt.rcParams['font.sans-serif']
+                font_set = True
+                print(f"成功设置中文字体: {font_name}")
+                break
+        except Exception as e:
+            print(f"尝试设置字体 {font_name} 失败: {e}")
+            continue
+    
+    if not font_set:
+        print("警告: 未能找到合适的中文字体，图表中的中文可能无法正常显示")
+        # 尝试使用系统默认字体
+        try:
+            plt.rcParams['font.sans-serif'] = ['DejaVu Sans'] + plt.rcParams['font.sans-serif']
+        except:
+            pass
+    
+    # 修复负号显示问题
+    plt.rcParams['axes.unicode_minus'] = False
+    
+    return plt.rcParams['font.sans-serif'][0]
+
+def set_chinese_plot_style():
+    """设置支持中文的绘图样式"""
+    # 配置中文字体
+    configure_chinese_fonts()
+    
+    # 调用原有的平台特定设置
+    adaptive_plotter.setup_platform_specific_settings()
+
+def save_chinese_plot(filename, dpi=300):
+    """保存支持中文的图表"""
+    try:
+        plt.savefig(filename, dpi=dpi, bbox_inches='tight', facecolor='white')
+        print(f"图表已保存为: {filename}")
+        return True
+    except Exception as e:
+        print(f"保存图表失败: {e}")
+        return False
+
+# ==================== 中文字体支持 ====================
+
+def configure_chinese_fonts():
+    """配置中文字体支持"""
+    import matplotlib.font_manager as fm
+    import os
+    
+    # 根据操作系统选择合适的字体
+    if platform.system() == 'Windows':
+        # Windows 系统字体
+        font_names = ['Microsoft YaHei', 'SimHei', 'SimSun', 'KaiTi']
+    elif platform.system() == 'Darwin':  # macOS
+        font_names = ['PingFang SC', 'Hiragino Sans GB', 'STHeiti', 'Arial Unicode MS']
+    else:  # Linux
+        font_names = ['WenQuanYi Micro Hei', 'DejaVu Sans', 'Liberation Sans', 'Noto Sans CJK SC']
+    
+    # 尝试设置字体
+    font_set = False
+    for font_name in font_names:
+        try:
+            # 检查字体是否可用
+            font_path = fm.findfont(fm.FontProperties(family=font_name))
+            if os.path.exists(font_path) and font_path != plt.rcParams['font.sans-serif'][0]:
+                plt.rcParams['font.sans-serif'] = [font_name] + plt.rcParams['font.sans-serif']
+                font_set = True
+                print(f"成功设置中文字体: {font_name}")
+                break
+        except Exception as e:
+            print(f"尝试设置字体 {font_name} 失败: {e}")
+            continue
+    
+    if not font_set:
+        print("警告: 未能找到合适的中文字体，图表中的中文可能无法正常显示")
+        # 尝试使用系统默认字体
+        try:
+            plt.rcParams['font.sans-serif'] = ['DejaVu Sans'] + plt.rcParams['font.sans-serif']
+        except:
+            pass
+    
+    # 修复负号显示问题
+    plt.rcParams['axes.unicode_minus'] = False
+    
+    return plt.rcParams['font.sans-serif'][0]
+
+def set_chinese_plot_style():
+    """设置支持中文的绘图样式"""
+    # 配置中文字体
+    configure_chinese_fonts()
+    
+    # 调用原有的平台特定设置
+    adaptive_plotter.setup_platform_specific_settings()
+
+def save_chinese_plot(filename, dpi=300):
+    """保存支持中文的图表"""
+    try:
+        plt.savefig(filename, dpi=dpi, bbox_inches='tight', facecolor='white')
+        print(f"图表已保存为: {filename}")
+        return True
+    except Exception as e:
+        print(f"保存图表失败: {e}")
+        return False

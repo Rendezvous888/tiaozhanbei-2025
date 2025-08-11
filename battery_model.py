@@ -260,4 +260,332 @@ class BatteryModel:
             current = self.config.rated_current_a if t < 12 * 3600 else -self.config.rated_current_a
             self.update_state(current, dt, ambient)
 
+    # ----------------------------- 新增实用方法 -----------------------------
+    
+    def get_battery_status(self) -> dict:
+        """获取电池完整状态信息，用于监控和诊断。"""
+        return {
+            'soc': self.state_of_charge,
+            'voltage_v': self.get_voltage(),
+            'ocv_v': self.ocv_v,
+            'current_a': self.last_current_a,
+            'cell_temperature_c': self.cell_temperature_c,
+            'ambient_temperature_c': self.ambient_temperature_c,
+            'effective_capacity_ah': self.effective_capacity_ah,
+            'capacity_fade_percent': self.capacity_fade_fraction * 100.0,
+            'resistance_growth_percent': self.resistance_growth_fraction * 100.0,
+            'equivalent_full_cycles': self.equivalent_full_cycles,
+            'cumulative_throughput_ah': self.cumulative_throughput_ah,
+            'resistance_ohm': self.resistance_ohm,
+            'c_rate': abs(self.last_current_a) / max(1e-6, self.config.rated_capacity_ah)
+        }
+    
+    def check_safety_limits(self) -> dict:
+        """检查电池是否在安全运行范围内。"""
+        warnings = []
+        critical_alerts = []
+        
+        # SOC 检查
+        if self.state_of_charge < 0.05:
+            warnings.append("SOC过低 (<5%)")
+        elif self.state_of_charge > 0.95:
+            warnings.append("SOC过高 (>95%)")
+        
+        # 温度检查
+        if self.cell_temperature_c > 60.0:
+            critical_alerts.append(f"电池温度过高: {self.cell_temperature_c:.1f}°C")
+        elif self.cell_temperature_c < 0.0:
+            warnings.append(f"电池温度过低: {self.cell_temperature_c:.1f}°C")
+        
+        # 过载检查
+        overload_ratio = abs(self.last_current_a) / max(1e-6, self.config.rated_current_a)
+        if overload_ratio > 3.0:
+            critical_alerts.append(f"严重过载: {overload_ratio:.1f}x 额定电流")
+        elif overload_ratio > 2.0:
+            warnings.append(f"中等过载: {overload_ratio:.1f}x 额定电流")
+        
+        # 寿命检查
+        if self.capacity_fade_fraction > 0.2:
+            warnings.append(f"容量衰减严重: {self.capacity_fade_fraction*100:.1f}%")
+        
+        return {
+            'warnings': warnings,
+            'critical_alerts': critical_alerts,
+            'is_safe': len(critical_alerts) == 0,
+            'overload_ratio': overload_ratio
+        }
+    
+    def estimate_remaining_life(self) -> dict:
+        """估算电池剩余寿命（基于当前衰减趋势）。"""
+        # 简化的寿命估算模型
+        calendar_life_years = 10.0  # 假设日历寿命10年
+        cycle_life_efc = 4000.0     # 假设循环寿命4000次等效满循环
+        
+        # 计算剩余日历寿命
+        calendar_fade_rate = self.config.calendar_fade_per_year_at_25c
+        remaining_calendar_years = max(0.0, (0.2 - self.capacity_fade_fraction) / calendar_fade_rate)
+        
+        # 计算剩余循环寿命
+        remaining_cycles = max(0.0, cycle_life_efc - self.equivalent_full_cycles)
+        
+        # 取较小值作为整体寿命
+        remaining_life_years = min(remaining_calendar_years, remaining_cycles / 365.0)
+        
+        return {
+            'remaining_calendar_years': remaining_calendar_years,
+            'remaining_cycles': remaining_cycles,
+            'remaining_life_years': remaining_life_years,
+            'health_percentage': max(0.0, (1.0 - self.capacity_fade_fraction) * 100.0)
+        }
+    
+    def simulate_constant_power_discharge(self, power_w: float, ambient_temp_c: float, 
+                                       max_duration_hours: float = 2.0) -> dict:
+        """模拟恒功率放电过程，返回放电曲线和关键指标。"""
+        dt = 1.0  # 1秒步长
+        max_steps = int(max_duration_hours * 3600)
+        
+        time_points = []
+        voltage_points = []
+        soc_points = []
+        current_points = []
+        temp_points = []
+        
+        initial_soc = self.state_of_charge
+        initial_temp = self.cell_temperature_c
+        
+        for step in range(max_steps):
+            # 计算当前电流（基于功率和电压）
+            current_voltage = self.get_voltage()
+            if current_voltage <= 0:
+                break
+                
+            current = power_w / current_voltage
+            if current > self.config.rated_current_a * 3.0:  # 限制最大电流
+                current = self.config.rated_current_a * 3.0
+            
+            # 更新状态
+            self.update_state(current, dt, ambient_temp_c)
+            
+            # 记录数据
+            time_points.append(step * dt / 3600.0)  # 转换为小时
+            voltage_points.append(self.get_voltage())
+            soc_points.append(self.state_of_charge)
+            current_points.append(current)
+            temp_points.append(self.cell_temperature_c)
+            
+            # 检查终止条件
+            if self.state_of_charge <= 0.05 or self.get_voltage() <= 0:
+                break
+        
+        # 恢复初始状态
+        self.state_of_charge = initial_soc
+        self.cell_temperature_c = initial_temp
+        
+        return {
+            'time_hours': time_points,
+            'voltage_v': voltage_points,
+            'soc': soc_points,
+            'current_a': current_points,
+            'temperature_c': temp_points,
+            'discharge_capacity_ah': (initial_soc - self.state_of_charge) * self.config.rated_capacity_ah,
+            'discharge_energy_wh': power_w * (len(time_points) * dt / 3600.0),
+            'max_current_a': max(current_points) if current_points else 0.0,
+            'min_voltage_v': min(voltage_points) if voltage_points else 0.0
+        }
+
+    # ----------------------------- 新增实用方法 -----------------------------
+    
+    def get_battery_status(self) -> dict:
+        """获取电池完整状态信息，用于监控和诊断。"""
+        return {
+            'soc': self.state_of_charge,
+            'voltage_v': self.get_voltage(),
+            'ocv_v': self.ocv_v,
+            'current_a': self.last_current_a,
+            'cell_temperature_c': self.cell_temperature_c,
+            'ambient_temperature_c': self.ambient_temperature_c,
+            'effective_capacity_ah': self.effective_capacity_ah,
+            'capacity_fade_percent': self.capacity_fade_fraction * 100.0,
+            'resistance_growth_percent': self.resistance_growth_fraction * 100.0,
+            'equivalent_full_cycles': self.equivalent_full_cycles,
+            'cumulative_throughput_ah': self.cumulative_throughput_ah,
+            'resistance_ohm': self.resistance_ohm,
+            'c_rate': abs(self.last_current_a) / max(1e-6, self.config.rated_capacity_ah)
+        }
+    
+    def check_safety_limits(self) -> dict:
+        """检查电池是否在安全运行范围内。"""
+        warnings = []
+        critical_alerts = []
+        
+        # SOC 检查
+        if self.state_of_charge < 0.05:
+            warnings.append("SOC过低 (<5%)")
+        elif self.state_of_charge > 0.95:
+            warnings.append("SOC过高 (>95%)")
+        
+        # 温度检查
+        if self.cell_temperature_c > 60.0:
+            critical_alerts.append(f"电池温度过高: {self.cell_temperature_c:.1f}°C")
+        elif self.cell_temperature_c < 0.0:
+            warnings.append(f"电池温度过低: {self.cell_temperature_c:.1f}°C")
+        
+        # 过载检查
+        overload_ratio = abs(self.last_current_a) / max(1e-6, self.config.rated_current_a)
+        if overload_ratio > 3.0:
+            critical_alerts.append(f"严重过载: {overload_ratio:.1f}x 额定电流")
+        elif overload_ratio > 2.0:
+            warnings.append(f"中等过载: {overload_ratio:.1f}x 额定电流")
+        
+        # 寿命检查
+        if self.capacity_fade_fraction > 0.2:
+            warnings.append(f"容量衰减严重: {self.capacity_fade_fraction*100:.1f}%")
+        
+        return {
+            'warnings': warnings,
+            'critical_alerts': critical_alerts,
+            'is_safe': len(critical_alerts) == 0,
+            'overload_ratio': overload_ratio
+        }
+    
+    def estimate_remaining_life(self) -> dict:
+        """估算电池剩余寿命（基于当前衰减趋势）。"""
+        # 简化的寿命估算模型
+        calendar_life_years = 10.0  # 假设日历寿命10年
+        cycle_life_efc = 4000.0     # 假设循环寿命4000次等效满循环
+        
+        # 计算剩余日历寿命
+        calendar_fade_rate = self.config.calendar_fade_per_year_at_25c
+        remaining_calendar_years = max(0.0, (0.2 - self.capacity_fade_fraction) / calendar_fade_rate)
+        
+        # 计算剩余循环寿命
+        remaining_cycles = max(0.0, cycle_life_efc - self.equivalent_full_cycles)
+        
+        # 取较小值作为整体寿命
+        remaining_life_years = min(remaining_calendar_years, remaining_cycles / 365.0)
+        
+        return {
+            'remaining_calendar_years': remaining_calendar_years,
+            'remaining_cycles': remaining_cycles,
+            'remaining_life_years': remaining_life_years,
+            'health_percentage': max(0.0, (1.0 - self.capacity_fade_fraction) * 100.0)
+        }
+    
+    def simulate_constant_power_discharge(self, power_w: float, ambient_temp_c: float, 
+                                       max_duration_hours: float = 2.0) -> dict:
+        """模拟恒功率放电过程，返回放电曲线和关键指标。"""
+        dt = 1.0  # 1秒步长
+        max_steps = int(max_duration_hours * 3600)
+        
+        time_points = []
+        voltage_points = []
+        soc_points = []
+        current_points = []
+        temp_points = []
+        
+        initial_soc = self.state_of_charge
+        initial_temp = self.cell_temperature_c
+        
+        for step in range(max_steps):
+            # 计算当前电流（基于功率和电压）
+            current_voltage = self.get_voltage()
+            if current_voltage <= 0:
+                break
+                
+            current = power_w / current_voltage
+            if current > self.config.rated_current_a * 3.0:  # 限制最大电流
+                current = self.config.rated_current_a * 3.0
+            
+            # 更新状态
+            self.update_state(current, dt, ambient_temp_c)
+            
+            # 记录数据
+            time_points.append(step * dt / 3600.0)  # 转换为小时
+            voltage_points.append(self.get_voltage())
+            soc_points.append(self.state_of_charge)
+            current_points.append(current)
+            temp_points.append(self.cell_temperature_c)
+            
+            # 检查终止条件
+            if self.state_of_charge <= 0.05 or self.get_voltage() <= 0:
+                break
+        
+        # 恢复初始状态
+        self.state_of_charge = initial_soc
+        self.cell_temperature_c = initial_temp
+        
+        return {
+            'time_hours': time_points,
+            'voltage_v': voltage_points,
+            'soc': soc_points,
+            'current_a': current_points,
+            'temperature_c': temp_points,
+            'discharge_capacity_ah': (initial_soc - self.state_of_charge) * self.config.rated_capacity_ah,
+            'discharge_energy_wh': power_w * (len(time_points) * dt / 3600.0),
+            'max_current_a': max(current_points) if current_points else 0.0,
+            'min_voltage_v': min(voltage_points) if voltage_points else 0.0
+        }
+
+
+if __name__ == "__main__":
+    # 创建电池模型实例
+    battery = BatteryModel(initial_soc=1, initial_temperature_c=25.0)
+    
+    print("=== 35 kV/25 MW 级联储能 PCS 电池模型测试 ===")
+    print(f"初始状态: SOC={battery.state_of_charge:.1%}, 温度={battery.cell_temperature_c:.1f}°C")
+    print(f"额定容量: {battery.config.rated_capacity_ah:.1f} Ah")
+    print(f"额定电流: {battery.config.rated_current_a:.1f} A")
+    print(f"串联电芯数: {battery.config.series_cells}")
+    
+    # 模拟24小时运行
+    print("\n=== 开始24小时一充一放仿真 ===")
+    battery.example_daily_profile()
+    
+    # 输出最终状态
+    print(f"\n最终状态:")
+    print(f"SOC: {battery.state_of_charge:.1%}")
+    print(f"电池温度: {battery.cell_temperature_c:.1f}°C")
+    print(f"容量衰减: {battery.capacity_fade_fraction*100:.3f}%")
+    print(f"等效循环数: {battery.equivalent_full_cycles:.1f}")
+    
+    # 检查安全状态
+    safety = battery.check_safety_limits()
+    print(f"\n安全状态: {'安全' if safety['is_safe'] else '警告'}")
+    if safety['warnings']:
+        print(f"警告: {', '.join(safety['warnings'])}")
+    if safety['critical_alerts']:
+        print(f"严重警告: {', '.join(safety['critical_alerts'])}")
+    
+    # 估算剩余寿命
+    life_estimate = battery.estimate_remaining_life()
+    print(f"\n寿命估算:")
+    print(f"健康度: {life_estimate['health_percentage']:.1f}%")
+    print(f"剩余寿命: {life_estimate['remaining_life_years']:.1f} 年")
+    print(f"剩余循环数: {life_estimate['remaining_cycles']:.0f}")
+    
+    # 测试过载工况
+    print(f"\n=== 测试3倍过载工况 ===")
+    battery.state_of_charge = 0.8  # 重置SOC
+    battery.cell_temperature_c = 25.0  # 重置温度
+    
+    # 模拟3倍额定电流放电
+    overload_current = battery.config.rated_current_a * 3.0
+    print(f"过载电流: {overload_current:.1f} A")
+    
+    # 运行10分钟过载测试
+    for i in range(600):  # 10分钟 = 600秒
+        battery.update_state(overload_current, 1.0, 30.0)
+        if i % 60 == 0:  # 每分钟输出一次状态
+            status = battery.get_battery_status()
+            print(f"第{i//60}分钟: SOC={status['soc']:.1%}, 电压={status['voltage_v']:.1f}V, "
+                  f"温度={status['cell_temperature_c']:.1f}°C, C率={status['c_rate']:.1f}")
+    
+    # 检查过载后的安全状态
+    overload_safety = battery.check_safety_limits()
+    print(f"\n过载后安全状态: {'安全' if overload_safety['is_safe'] else '警告'}")
+    if overload_safety['warnings']:
+        print(f"警告: {', '.join(overload_safety['warnings'])}")
+    if overload_safety['critical_alerts']:
+        print(f"严重警告: {', '.join(overload_safety['critical_alerts'])}")
+
 
