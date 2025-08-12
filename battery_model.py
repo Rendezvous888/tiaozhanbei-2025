@@ -529,7 +529,7 @@ class BatteryModel:
 
 if __name__ == "__main__":
     # 创建电池模型实例
-    battery = BatteryModel(initial_soc=1, initial_temperature_c=25.0)
+    battery = BatteryModel(initial_soc=0.8, initial_temperature_c=25.0)
     
     print("=== 35 kV/25 MW 级联储能 PCS 电池模型测试 ===")
     print(f"初始状态: SOC={battery.state_of_charge:.1%}, 温度={battery.cell_temperature_c:.1f}°C")

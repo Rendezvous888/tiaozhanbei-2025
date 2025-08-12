@@ -434,7 +434,7 @@ class EnergyStorageBatteryModel:
             'max_overload_ratio': self.config.max_overload_ratio,
             'temperature_range_c': [
                 self.config.min_temperature_c,
-                self.config.config.max_temperature_c
+                self.config.max_temperature_c
             ],
             'target_life_years': self.config.target_life_years
         }
