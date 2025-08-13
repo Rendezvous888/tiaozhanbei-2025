@@ -285,6 +285,10 @@ def generate_simulation_report(results, analysis, params):
     # 创建DataFrame
     df = pd.DataFrame(report_data)
     
+    # 确保result目录存在
+    import os
+    os.makedirs('result', exist_ok=True)
+    
     # 保存报告
     report_filename = f"result/PCS_仿真报告_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
     df.to_csv(report_filename, index=False, encoding='utf-8-sig')

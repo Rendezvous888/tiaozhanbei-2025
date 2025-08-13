@@ -16,9 +16,9 @@ class SystemParameters:
         # 全局时间步长（秒）
         self.time_step_seconds = 60
         
-        # 级联H桥配置
-        self.cascaded_power_modules = 40  # 级联功率模块数（统一至比赛要求）
-        self.module_switching_frequency_Hz = 750  # 模块开关频率 (Hz)
+        # 级联H桥配置（比赛方案口径）：每相级联模块数 40、模块开关频率 1000 Hz
+        self.cascaded_power_modules = 40
+        self.module_switching_frequency_Hz = 1000  # 模块开关频率 (Hz)
         self.rated_current_A = 420  # 额定电流 (A)
         self.overload_capability_pu = "3 pu / 10s"  # 过载能力
         

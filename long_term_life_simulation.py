@@ -397,6 +397,10 @@ class LongTermLifeSimulation:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             filename = f'result/长期寿命分析结果_{timestamp}.csv'
         
+        # 确保result目录存在
+        import os
+        os.makedirs('result', exist_ok=True)
+        
         results_df.to_csv(filename, index=False, encoding='utf-8-sig')
         print(f"结果已保存到: {filename}")
         return filename

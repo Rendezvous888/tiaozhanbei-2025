@@ -340,6 +340,10 @@ class DetailedLifeAnalysis:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f'result/详细寿命分析报告_{timestamp}.csv'
         
+        # 确保result目录存在
+        import os
+        os.makedirs('result', exist_ok=True)
+        
         # 添加分析指标
         detailed_results = self.results.copy()
         detailed_results['年化寿命消耗率'] = detailed_results.groupby('load_type')['igbt_life_consumption'].diff() / detailed_results.groupby('load_type')['years'].diff()
