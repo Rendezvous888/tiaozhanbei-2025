@@ -367,7 +367,7 @@ class BatteryModel:
 if __name__ == "__main__":
     # 创建电池模型实例
     t_env = 25
-    battery = BatteryModel(initial_soc=0.8, initial_temperature_c=t_env)
+    battery = BatteryModel(initial_soc=0.5, initial_temperature_c=t_env)
 
     print("=== 35 kV/25 MW 级联储能 PCS 电池模型测试 ===")
     print(f"初始状态: SOC={battery.state_of_charge:.1%}, 温度={battery.cell_temperature_c:.1f}°C")
@@ -380,7 +380,7 @@ if __name__ == "__main__":
     sys_params = get_optimized_parameters()['system']
     step_seconds = int(getattr(sys_params, 'time_step_seconds', 60))
     P_profile_raw, T_amb = generate_profiles(day_type="summer-weekday", step_seconds=step_seconds)
-    p_profile = np.repeat(P_profile_raw, step_seconds) / 30
+    p_profile = np.repeat(P_profile_raw, step_seconds) / 10000
 
     time_s = []
     voltage_v = []
