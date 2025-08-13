@@ -27,7 +27,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from scipy.io import loadmat
 
-from load_profile import generate_profiles
+from load_profile import generate_load_profile_new
 
 KELVIN_OFFSET: float = 273.15
 
@@ -379,8 +379,10 @@ if __name__ == "__main__":
 
     sys_params = get_optimized_parameters()['system']
     step_seconds = int(getattr(sys_params, 'time_step_seconds', 60))
-    P_profile_raw, T_amb = generate_profiles(day_type="summer-weekday", step_seconds=step_seconds)
-    p_profile = np.repeat(P_profile_raw, step_seconds) / 10000
+    P_profile_raw = generate_load_profile_new(day_type="summer-weekday", step_seconds=step_seconds)
+    repeat_time = 60
+    P_profile_raw = np.tile(P_profile_raw, repeat_time)
+    p_profile = np.repeat(P_profile_raw, step_seconds/repeat_time) / 40
 
     time_s = []
     voltage_v = []

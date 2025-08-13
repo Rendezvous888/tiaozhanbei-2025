@@ -127,6 +127,64 @@ def generate_load_profile(day_type: str, step_seconds: int = 60) -> np.ndarray:
     return P.astype(float)
 
 
+def generate_load_profile_new(
+    day_type: str,
+    step_seconds: int = 60,
+    *,
+    peak_w: float = 25e6,           # 25 MW 峰值
+    num_packs: int = 120,           # 电池包数量
+    capacity_ah: float = 314.0,     # 每包容量 [Ah]
+    series_cells: int = 312,        # 每包串数（估算名义电压用）
+    v_cell_nominal: float = 3.35,   # 单体名义电压 [V]（LFP 平台约 3.3~3.4）
+    soc_min: float = 0.05,
+    soc_max: float = 0.95,
+    soc0: float = 0.5,      # 起始 SOC；默认窗口中点
+    safety_margin: float = 0.98,    # 略降一点避免边界卡死
+) -> np.ndarray:
+    """
+    生成 24h 的功率序列 P[t] (W)，按 25 MW 顶峰缩放，并保证 SOC 不越过 [soc_min, soc_max]。
+    要求你已有：
+      - _seasonal_baseline(day_type, step_seconds) -> (P_base, t_hr)
+      - _inject_overload_shocks(P, step_seconds)   # 可选：对 P 就地注入过载片段
+    """
+    # 1) 基线 + 过载片段（你已有的函数）
+    P, t_hr = _seasonal_baseline(day_type, step_seconds)   # 形状 (T,)
+    _inject_overload_shocks(P, step_seconds)               # 可选：如果不需要可注释
+
+    # 2) 去均值（保证 24h 能量平衡），避免 SOC 漂移
+    P = P.astype(float)
+    P -= np.mean(P)
+
+    # 3) 峰值约束缩放系数（25 MW）
+    peak_raw = float(np.max(np.abs(P))) if np.any(P) else 1.0
+    scale_peak = (peak_w / peak_raw) if peak_raw > 1e-12 else 1.0
+
+    # 4) 能量窗约束（不越 SOC 窗口）
+    #    可用能量窗口（Wh）：总能量 * 起始点可上下摆幅的最小边
+    if soc0 is None:
+        soc0 = 0.5 * (soc_min + soc_max) + 0.5 * (soc_max - soc_min)  # = 0.5; 写长是为了看清逻辑
+        soc0 = 0.5  # 上面那句等价于 0.5，这里直给
+    swing = min(soc0 - soc_min, soc_max - soc0)  # 能上下摆动的SOC幅度
+    v_nom = series_cells * v_cell_nominal        # 模块名义电压
+    E_total_Wh = num_packs * capacity_ah * v_nom # 总名义能量
+    E_window_Wh = E_total_Wh * swing             # 可摆动能量窗口
+
+    # 基于未缩放曲线计算“最大累积能量偏移”
+    dt_h = step_seconds / 3600.0
+    cum_Wh = np.cumsum(P) * dt_h                 # 单位 Wh
+    max_abs_cum_Wh = float(np.max(np.abs(cum_Wh))) if cum_Wh.size else 0.0
+    scale_energy = (E_window_Wh / max_abs_cum_Wh) if max_abs_cum_Wh > 1e-12 else 1.0
+
+    # 5) 取两者最小，并加安全裕度
+    scale = safety_margin * min(scale_peak, scale_energy)
+    P_scaled = P * scale
+
+    # 6)（可选）再次去均值，防止数值误差导致微小漂移
+    P_scaled -= np.mean(P_scaled)
+
+    return P_scaled
+
+
 def generate_profiles(day_type: str, step_seconds: int = 60) -> Tuple[np.ndarray, np.ndarray]:
     """便捷函数：同时返回功率与温度两个对齐序列。step_seconds 支持 60, 30, 10, 1 等。"""
     P = generate_load_profile(day_type, step_seconds=step_seconds)
