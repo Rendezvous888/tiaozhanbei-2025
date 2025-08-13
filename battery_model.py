@@ -24,7 +24,10 @@ import math
 from typing import Optional
 
 import numpy as np
+from matplotlib import pyplot as plt
 from scipy.io import loadmat
+
+from load_profile import generate_profiles
 
 KELVIN_OFFSET: float = 273.15
 
@@ -329,10 +332,42 @@ class BatteryModel:
             'min_voltage_v': min(voltage_points) if voltage_points else 0.0
         }
 
+    def step(self, power_w: float, ambient_temp_c: float):
+        """模拟恒功率放电过程，返回放电曲线和关键指标。"""
+        dt = 1.0  # 1秒步长
+
+        def get_curr(E, P, R):
+            """E: OCV[V], R: internal resistance[Ω], P: port power[W] (discharge>0, charge<0)"""
+            disc = E * E - 4 * R * P
+            if disc < 0:
+                raise ValueError(f"P 超过可达范围：P ≤ E^2/(4R) = {E * E / (4 * R):.4f} W")
+            I_minus = (E - math.sqrt(disc)) / (2 * R)
+            I_plus = (E + math.sqrt(disc)) / (2 * R)
+            return I_minus
+
+        E = self._string_ocv_v(self.state_of_charge, self.cell_temperature_c)
+        P = power_w
+        R = self._string_resistance_ohm(self.state_of_charge, self.cell_temperature_c)
+        current = get_curr(E, P, R)
+
+        # 计算当前电流（基于功率和电压
+        if current > self.config.rated_current_a * 3.0:  # 限制最大电流
+            current = self.config.rated_current_a * 3.0
+
+        # 更新状态
+        self.update_state(current, dt, ambient_temp_c)
+        return {
+            'voltage_v': self.get_voltage(),
+            'soc': self.state_of_charge,
+            'current_a': current,
+            'temperature_c': self.cell_temperature_c,
+        }
+
 
 if __name__ == "__main__":
     # 创建电池模型实例
-    battery = BatteryModel(initial_soc=0.8, initial_temperature_c=25.0)
+    t_env = 25
+    battery = BatteryModel(initial_soc=0.8, initial_temperature_c=t_env)
 
     print("=== 35 kV/25 MW 级联储能 PCS 电池模型测试 ===")
     print(f"初始状态: SOC={battery.state_of_charge:.1%}, 温度={battery.cell_temperature_c:.1f}°C")
@@ -340,6 +375,70 @@ if __name__ == "__main__":
     print(f"额定电流: {battery.config.rated_current_a:.1f} A")
     print(f"串联电芯数: {battery.config.series_cells}")
 
-    # 模拟24小时运行
-    print("\n=== 开始24小时一充一放仿真 ===")
-    battery.example_daily_profile()
+    from device_parameters import get_optimized_parameters
+
+    sys_params = get_optimized_parameters()['system']
+    step_seconds = int(getattr(sys_params, 'time_step_seconds', 60))
+    P_profile_raw, T_amb = generate_profiles(day_type="summer-weekday", step_seconds=step_seconds)
+    p_profile = np.repeat(P_profile_raw, step_seconds) / 30
+
+    time_s = []
+    voltage_v = []
+    soc = []
+    current_a = []
+    temp_c = []
+
+    t = 0
+    for p in p_profile:
+        rec = battery.step(float(p), t_env)  # 或用固定 t_env：battery.step(float(p), t_env)
+        time_s.append(t)
+        voltage_v.append(rec['voltage_v'])
+        soc.append(rec['soc'])
+        current_a.append(rec['current_a'])
+        temp_c.append(rec['temperature_c'])
+        t += 1  # 每步1秒
+
+    time_s = np.asarray(time_s, dtype=float)
+    voltage_v = np.asarray(voltage_v, dtype=float)
+    soc = np.asarray(soc, dtype=float)
+    current_a = np.asarray(current_a, dtype=float)
+    temp_c = np.asarray(temp_c, dtype=float)
+
+    # 时间轴（小时）
+    th = np.asarray(time_s, dtype=float) / 3600.0
+
+    # 创建 4 行 1 列子图（也可把 nrows=4, figsize 调大/调小）
+    fig, axs = plt.subplots(nrows=4, ncols=1, figsize=(12, 10), sharex=True)
+
+    # 1) 电压
+    axs[0].plot(th, voltage_v)
+    axs[0].set_ylabel("Voltage [V]")
+    axs[0].set_title("Terminal Voltage")
+    axs[0].grid(True)
+
+    # 2) SOC（转百分比更直观）
+    axs[1].plot(th, soc * 100.0)
+    axs[1].set_ylabel("SOC [%]")
+    axs[1].set_title("State of Charge")
+    axs[1].grid(True)
+
+    # 3) 电流
+    axs[2].plot(th, current_a)
+    axs[2].axhline(0, linestyle=":")  # 零参考线
+    axs[2].set_ylabel("Current [A]")
+    axs[2].set_title("Current")
+    axs[2].grid(True)
+
+    # 4) 功率（kW），显示实际与指令
+    axs[3].plot(th, p_profile / 1000.0, label="Actual")
+    axs[3].axhline(0, linestyle=":")  # 零参考线（充/放为正负）
+    axs[3].set_ylabel("Power [kW]")
+    axs[3].set_title("Power")
+    axs[3].grid(True)
+
+    axs[-1].set_xlabel("Time [h]")
+    fig.suptitle("Battery Run — Voltage / SOC / Current / Power vs Time", y=0.995)
+    fig.tight_layout()
+    plt.show()
+
+
