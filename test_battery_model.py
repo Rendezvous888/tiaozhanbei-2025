@@ -98,28 +98,6 @@ def test_overload_conditions():
         print(f"{ratio:8.1f} | {overload_current:8.0f} | {status['voltage_v']:8.1f} | "
               f"{status['cell_temperature_c']:8.1f} | {'安全' if safety['is_safe'] else '警告'}")
 
-def test_life_prediction():
-    """测试寿命预测"""
-    print("\n=== 测试寿命预测 ===")
-    
-    battery = BatteryModel(initial_soc=0.5, initial_temperature_c=25.0)
-    
-    # 模拟加速老化测试
-    print("循环次数 | 容量衰减(%) | 健康度(%) | 剩余寿命(年)")
-    print("-" * 50)
-    
-    for cycle in range(0, 1001, 100):
-        if cycle > 0:
-            # 模拟一次完整循环
-            battery.update_state(battery.config.rated_current_a, 2 * 3600, 30.0)  # 2小时放电
-            battery.update_state(-battery.config.rated_current_a, 2 * 3600, 30.0)  # 2小时充电
-        
-        life_estimate = battery.estimate_remaining_life()
-        status = battery.get_battery_status()
-        
-        print(f"{cycle:8d} | {status['capacity_fade_percent']:12.2f} | {life_estimate['health_percentage']:10.1f} | "
-              f"{life_estimate['remaining_life_years']:14.1f}")
-
 def plot_discharge_curves():
     """绘制放电曲线"""
     print("\n=== 绘制放电曲线 ===")
@@ -157,17 +135,17 @@ def plot_discharge_curves():
     plt.legend()
     plt.grid(True)
     
+    # plt.subplot(2, 2, 2)
+    # for temp in temperatures:
+    #     data = discharge_data[temp]
+    #     plt.plot(data['time_hours'], data['soc'], label=f'{temp}°C', linewidth=2)
+    # plt.xlabel('时间 (小时)')
+    # plt.ylabel('SOC')
+    # plt.title('不同温度下的放电时间曲线')
+    # plt.legend()
+    # plt.grid(True)
+    #
     plt.subplot(2, 2, 2)
-    for temp in temperatures:
-        data = discharge_data[temp]
-        plt.plot(data['time_hours'], data['soc'], label=f'{temp}°C', linewidth=2)
-    plt.xlabel('时间 (小时)')
-    plt.ylabel('SOC')
-    plt.title('不同温度下的放电时间曲线')
-    plt.legend()
-    plt.grid(True)
-    
-    plt.subplot(2, 2, 3)
     for temp in temperatures:
         data = discharge_data[temp]
         plt.plot(data['time_hours'], data['temperature_c'], label=f'{temp}°C', linewidth=2)
@@ -177,14 +155,12 @@ def plot_discharge_curves():
     plt.legend()
     plt.grid(True)
     
-    plt.subplot(2, 2, 4)
-    for temp in temperatures:
-        data = discharge_data[temp]
-        plt.plot(data['time_hours'], data['current_a'], label=f'{temp}°C', linewidth=2)
+    plt.subplot(2, 2, 3)
+    data = discharge_data[25]
+    plt.plot(data['time_hours'], data['current_a'], label=f'{25}°C', linewidth=2)
     plt.xlabel('时间 (小时)')
     plt.ylabel('电流 (A)')
-    plt.title('不同温度下的电流曲线')
-    plt.legend()
+    plt.title('25摄氏度下的电流曲线')
     plt.grid(True)
     
     plt.tight_layout()
@@ -206,7 +182,6 @@ def main():
         test_soc_update()
         test_temperature_effects()
         test_overload_conditions()
-        test_life_prediction()
         
         # 绘制图表
         plot_discharge_curves()

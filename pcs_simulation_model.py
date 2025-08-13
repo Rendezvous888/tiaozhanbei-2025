@@ -1,12 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.integrate import solve_ivp
-from scipy.optimize import minimize
 import rainflow
-from deap import base, creator, tools, algorithms
-import random
-import pandas as pd
-from datetime import datetime, timedelta
 
 # 设置中文字体
 plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans']
