@@ -109,34 +109,29 @@ class AdaptivePlotter:
         # 处理特殊输入情况
         if isinstance(data, list) and len(data) == 2:
             if data[0] == 0 and data[1] is None:
-                # 特殊情况：从0开始，上限自动
                 ax.set_ylim(bottom=0)
                 return
             elif data[0] is None and data[1] == 0:
-                # 特殊情况：上限为0，下限自动
                 ax.set_ylim(top=0)
                 return
         
-        # 正常数据处理
-        if isinstance(data, (list, np.ndarray)):
-            # 过滤掉None值
-            valid_data = [x for x in data if x is not None]
-            if not valid_data:
-                return
-            
-            data_min = np.min(valid_data)
-            data_max = np.max(valid_data)
-        else:
+        # 将数据转换为一维数组并过滤无效值
+        try:
+            arr = np.asarray(data).astype(float).ravel()
+        except Exception:
+            # 回退处理
             data_min = data.min()
             data_max = data.max()
+        else:
+            finite_mask = np.isfinite(arr)
+            if not np.any(finite_mask):
+                return
+            data_min = float(np.min(arr[finite_mask]))
+            data_max = float(np.max(arr[finite_mask]))
         
         data_range = data_max - data_min
         
-        # 如果数据范围太小，使用最小边距
-        if data_range < min_margin:
-            margin = min_margin
-        else:
-            margin = max(data_range * margin_factor, min_margin)
+        margin = min_margin if data_range < min_margin else max(data_range * margin_factor, min_margin)
         
         y_min = max(0, data_min - margin) if data_min >= 0 else data_min - margin
         y_max = data_max + margin
@@ -145,20 +140,20 @@ class AdaptivePlotter:
     
     def set_adaptive_xlim(self, ax, data, margin_factor=0.1, min_margin=0.05):
         """设置自适应的X轴范围"""
-        if isinstance(data, (list, np.ndarray)):
-            data_min = np.min(data)
-            data_max = np.max(data)
-        else:
+        try:
+            arr = np.asarray(data).astype(float).ravel()
+        except Exception:
             data_min = data.min()
             data_max = data.max()
+        else:
+            finite_mask = np.isfinite(arr)
+            if not np.any(finite_mask):
+                return
+            data_min = float(np.min(arr[finite_mask]))
+            data_max = float(np.max(arr[finite_mask]))
         
         data_range = data_max - data_min
-        
-        # 如果数据范围太小，使用最小边距
-        if data_range < min_margin:
-            margin = min_margin
-        else:
-            margin = max(data_range * margin_factor, min_margin)
+        margin = min_margin if data_range < min_margin else max(data_range * margin_factor, min_margin)
         
         x_min = data_min - margin
         x_max = data_max + margin
@@ -258,18 +253,15 @@ def configure_chinese_fonts():
     
     # 根据操作系统选择合适的字体
     if platform.system() == 'Windows':
-        # Windows 系统字体
         font_names = ['Microsoft YaHei', 'SimHei', 'SimSun', 'KaiTi']
-    elif platform.system() == 'Darwin':  # macOS
+    elif platform.system() == 'Darwin':
         font_names = ['PingFang SC', 'Hiragino Sans GB', 'STHeiti', 'Arial Unicode MS']
-    else:  # Linux
+    else:
         font_names = ['WenQuanYi Micro Hei', 'DejaVu Sans', 'Liberation Sans', 'Noto Sans CJK SC']
     
-    # 尝试设置字体
     font_set = False
     for font_name in font_names:
         try:
-            # 检查字体是否可用
             font_path = fm.findfont(fm.FontProperties(family=font_name))
             if os.path.exists(font_path) and font_path != plt.rcParams['font.sans-serif'][0]:
                 plt.rcParams['font.sans-serif'] = [font_name] + plt.rcParams['font.sans-serif']
@@ -282,85 +274,18 @@ def configure_chinese_fonts():
     
     if not font_set:
         print("警告: 未能找到合适的中文字体，图表中的中文可能无法正常显示")
-        # 尝试使用系统默认字体
         try:
             plt.rcParams['font.sans-serif'] = ['DejaVu Sans'] + plt.rcParams['font.sans-serif']
-        except:
+        except Exception:
             pass
     
-    # 修复负号显示问题
     plt.rcParams['axes.unicode_minus'] = False
     
     return plt.rcParams['font.sans-serif'][0]
 
 def set_chinese_plot_style():
     """设置支持中文的绘图样式"""
-    # 配置中文字体
     configure_chinese_fonts()
-    
-    # 调用原有的平台特定设置
-    adaptive_plotter.setup_platform_specific_settings()
-
-def save_chinese_plot(filename, dpi=300):
-    """保存支持中文的图表"""
-    try:
-        plt.savefig(filename, dpi=dpi, bbox_inches='tight', facecolor='white')
-        print(f"图表已保存为: {filename}")
-        return True
-    except Exception as e:
-        print(f"保存图表失败: {e}")
-        return False
-
-# ==================== 中文字体支持 ====================
-
-def configure_chinese_fonts():
-    """配置中文字体支持"""
-    import matplotlib.font_manager as fm
-    import os
-    
-    # 根据操作系统选择合适的字体
-    if platform.system() == 'Windows':
-        # Windows 系统字体
-        font_names = ['Microsoft YaHei', 'SimHei', 'SimSun', 'KaiTi']
-    elif platform.system() == 'Darwin':  # macOS
-        font_names = ['PingFang SC', 'Hiragino Sans GB', 'STHeiti', 'Arial Unicode MS']
-    else:  # Linux
-        font_names = ['WenQuanYi Micro Hei', 'DejaVu Sans', 'Liberation Sans', 'Noto Sans CJK SC']
-    
-    # 尝试设置字体
-    font_set = False
-    for font_name in font_names:
-        try:
-            # 检查字体是否可用
-            font_path = fm.findfont(fm.FontProperties(family=font_name))
-            if os.path.exists(font_path) and font_path != plt.rcParams['font.sans-serif'][0]:
-                plt.rcParams['font.sans-serif'] = [font_name] + plt.rcParams['font.sans-serif']
-                font_set = True
-                print(f"成功设置中文字体: {font_name}")
-                break
-        except Exception as e:
-            print(f"尝试设置字体 {font_name} 失败: {e}")
-            continue
-    
-    if not font_set:
-        print("警告: 未能找到合适的中文字体，图表中的中文可能无法正常显示")
-        # 尝试使用系统默认字体
-        try:
-            plt.rcParams['font.sans-serif'] = ['DejaVu Sans'] + plt.rcParams['font.sans-serif']
-        except:
-            pass
-    
-    # 修复负号显示问题
-    plt.rcParams['axes.unicode_minus'] = False
-    
-    return plt.rcParams['font.sans-serif'][0]
-
-def set_chinese_plot_style():
-    """设置支持中文的绘图样式"""
-    # 配置中文字体
-    configure_chinese_fonts()
-    
-    # 调用原有的平台特定设置
     adaptive_plotter.setup_platform_specific_settings()
 
 def save_chinese_plot(filename, dpi=300):
