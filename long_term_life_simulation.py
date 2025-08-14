@@ -1,6 +1,7 @@
 """
 长期寿命仿真模块
 用于分析IGBT和母线电容在长期运行（5年、10年等）后的剩余寿命
+包含详细寿命分析功能
 """
 
 import numpy as np
@@ -17,7 +18,7 @@ plt.rcParams['axes.unicode_minus'] = False
 plt.rcParams['font.size'] = 10
 
 class LongTermLifeSimulation:
-    """长期寿命仿真类"""
+    """长期寿命仿真类，包含详细寿命分析功能"""
     
     def __init__(self):
         # 系统参数
@@ -63,6 +64,9 @@ class LongTermLifeSimulation:
             'heavy_load': {'power_factor': 0.9, 'duty_cycle': 0.8},
             'peak_load': {'power_factor': 0.95, 'duty_cycle': 0.95},
         }
+        
+        # 仿真结果存储
+        self.simulation_results = None
         
     def generate_daily_load_profile(self, load_type='medium'):
         """生成日负载曲线"""
@@ -254,12 +258,26 @@ class LongTermLifeSimulation:
                     'capacitor_life_consumption': capacitor_life_consumption
                 })
         
-        return pd.DataFrame(results)
+        self.simulation_results = pd.DataFrame(results)
+        return self.simulation_results
     
     def plot_life_results(self, results_df):
         """绘制寿命结果"""
-        # 使用自适应绘图工具创建图形
-        fig, axes = create_adaptive_figure(2, 2, title='长期运行寿命分析结果', title_size=16)
+        # 创建更大的图形以避免重叠
+        fig = plt.figure(figsize=(16, 12), dpi=100)
+        fig.suptitle('长期运行寿命分析结果', fontsize=16, fontweight='bold', y=0.98)
+        
+        # 创建2x2子图网格，增加间距
+        gs = fig.add_gridspec(2, 2, hspace=0.3, wspace=0.3)
+        axes = []
+        
+        for i in range(2):
+            for j in range(2):
+                ax = fig.add_subplot(gs[i, j])
+                axes.append(ax)
+        
+        # 将axes重新组织为2D数组
+        axes = np.array(axes).reshape(2, 2)
         
         # IGBT剩余寿命
         ax1 = axes[0, 0]
@@ -269,7 +287,7 @@ class LongTermLifeSimulation:
                     label=f'{load_type}负载', linewidth=2, markersize=8)
         format_axis_labels(ax1, '运行年数', 'IGBT剩余寿命 (%)', 'IGBT剩余寿命 vs 运行时间')
         add_grid(ax1, alpha=0.3)
-        ax1.legend(fontsize=8, loc='best')
+        ax1.legend(fontsize=10, loc='upper right', bbox_to_anchor=(1.0, 1.0))
         set_adaptive_ylim(ax1, results_df['igbt_remaining_life'])
         
         # 电容剩余寿命
@@ -280,7 +298,7 @@ class LongTermLifeSimulation:
                     label=f'{load_type}负载', linewidth=2, markersize=8)
         format_axis_labels(ax2, '运行年数', '电容剩余寿命 (%)', '母线电容剩余寿命 vs 运行时间')
         add_grid(ax2, alpha=0.3)
-        ax2.legend(fontsize=8, loc='best')
+        ax2.legend(fontsize=10, loc='upper right', bbox_to_anchor=(1.0, 1.0))
         set_adaptive_ylim(ax2, results_df['capacitor_remaining_life'])
         
         # 平均温度
@@ -293,7 +311,7 @@ class LongTermLifeSimulation:
                     label=f'电容-{load_type}', linewidth=2, markersize=6)
         format_axis_labels(ax3, '运行年数', '平均温度 (°C)', '平均工作温度 vs 运行时间')
         add_grid(ax3, alpha=0.3)
-        ax3.legend(fontsize=8, loc='best')
+        ax3.legend(fontsize=10, loc='upper right', bbox_to_anchor=(1.0, 1.0))
         set_adaptive_ylim(ax3, np.concatenate([
             results_df['avg_igbt_temp'], 
             results_df['avg_cap_temp']
@@ -313,22 +331,22 @@ class LongTermLifeSimulation:
         format_axis_labels(ax4, '运行年数', '寿命消耗率', '中等负载下寿命消耗对比')
         ax4.set_xticks(x)
         ax4.set_xticklabels(years)
-        ax4.legend(fontsize=8, loc='best')
+        ax4.legend(fontsize=10, loc='upper right', bbox_to_anchor=(1.0, 1.0))
         add_grid(ax4, alpha=0.3)
         
-        # 添加数值标签，避免重叠
+        # 添加数值标签，避免重叠，增加间距
         for bar in bars1:
             height = bar.get_height()
-            ax4.text(bar.get_x() + bar.get_width()/2., height + 0.01,
-                    f'{height:.3f}', ha='center', va='bottom', fontsize=8)
+            ax4.text(bar.get_x() + bar.get_width()/2., height + 0.02,
+                    f'{height:.3f}', ha='center', va='bottom', fontsize=9, fontweight='bold')
         
         for bar in bars2:
             height = bar.get_height()
-            ax4.text(bar.get_x() + bar.get_width()/2., height + 0.01,
-                    f'{height:.3f}', ha='center', va='bottom', fontsize=8)
+            ax4.text(bar.get_x() + bar.get_width()/2., height + 0.02,
+                    f'{height:.3f}', ha='center', va='bottom', fontsize=9, fontweight='bold')
         
         # 优化布局，避免重叠
-        optimize_layout(fig, tight_layout=True, h_pad=1.5, w_pad=1.5)
+        plt.tight_layout()
         
         # 显示图形
         finalize_plot(fig)
@@ -405,6 +423,374 @@ class LongTermLifeSimulation:
         print(f"结果已保存到: {filename}")
         return filename
 
+    # ==================== 详细寿命分析功能 ====================
+    
+    def analyze_life_trends(self):
+        """分析寿命趋势"""
+        if self.simulation_results is None:
+            print("请先运行仿真获取数据")
+            return
+            
+        print("=" * 60)
+        print("详细寿命趋势分析")
+        print("=" * 60)
+        
+        # 按负载类型分组分析
+        load_types = self.simulation_results['load_type'].unique()
+        
+        for load_type in load_types:
+            data = self.simulation_results[self.simulation_results['load_type'] == load_type]
+            print(f"\n{load_type}负载工况分析:")
+            print(f"  1年运行: IGBT剩余寿命 {data[data['years']==1]['igbt_remaining_life'].iloc[0]:.1f}%")
+            print(f"  5年运行: IGBT剩余寿命 {data[data['years']==5]['igbt_remaining_life'].iloc[0]:.1f}%")
+            print(f"  10年运行: IGBT剩余寿命 {data[data['years']==10]['igbt_remaining_life'].iloc[0]:.1f}%")
+            
+            # 计算年化寿命消耗率
+            if len(data) > 1:
+                first_year = data[data['years']==1]['igbt_life_consumption'].iloc[0]
+                ten_year = data[data['years']==10]['igbt_life_consumption'].iloc[0]
+                annual_rate = (ten_year - first_year) / 9  # 9年间的平均年化率
+                print(f"  年化寿命消耗率: {annual_rate*100:.2f}%/年")
+    
+    def calculate_maintenance_schedule(self):
+        """计算维护计划"""
+        if self.simulation_results is None:
+            print("请先运行仿真获取数据")
+            return None
+            
+        print("\n" + "=" * 60)
+        print("维护计划建议")
+        print("=" * 60)
+        
+        maintenance_schedule = []
+        
+        for _, row in self.simulation_results.iterrows():
+            years = row['years']
+            load_type = row['load_type']
+            igbt_life = row['igbt_remaining_life']
+            cap_life = row['capacitor_remaining_life']
+            
+            # 根据剩余寿命确定维护建议
+            if igbt_life < 20:
+                maintenance = "立即更换IGBT"
+                urgency = "紧急"
+            elif igbt_life < 50:
+                maintenance = "计划更换IGBT"
+                urgency = "高"
+            elif igbt_life < 80:
+                maintenance = "加强监测"
+                urgency = "中"
+            else:
+                maintenance = "正常维护"
+                urgency = "低"
+            
+            maintenance_schedule.append({
+                'years': years,
+                'load_type': load_type,
+                'igbt_life': igbt_life,
+                'cap_life': cap_life,
+                'maintenance': maintenance,
+                'urgency': urgency
+            })
+        
+        maintenance_df = pd.DataFrame(maintenance_schedule)
+        
+        # 显示关键维护节点
+        critical_points = maintenance_df[maintenance_df['urgency'].isin(['紧急', '高'])]
+        if not critical_points.empty:
+            print("关键维护节点:")
+            for _, point in critical_points.iterrows():
+                print(f"  {point['years']}年 {point['load_type']}负载: {point['maintenance']} ({point['urgency']}优先级)")
+        
+        return maintenance_df
+    
+    def plot_detailed_analysis(self):
+        """绘制详细分析图表"""
+        if self.simulation_results is None:
+            print("请先运行仿真获取数据")
+            return
+            
+        # 创建更大的图形以避免重叠
+        fig = plt.figure(figsize=(20, 15), dpi=100)
+        fig.suptitle('IGBT和电容器详细寿命分析', fontsize=18, fontweight='bold', y=0.98)
+        
+        # 创建3x3子图网格，增加间距
+        gs = fig.add_gridspec(3, 3, hspace=0.4, wspace=0.3)
+        axes = []
+        
+        for i in range(3):
+            for j in range(3):
+                ax = fig.add_subplot(gs[i, j])
+                axes.append(ax)
+        
+        # 将axes重新组织为2D数组
+        axes = np.array(axes).reshape(3, 3)
+        
+        # 1. 寿命趋势对比
+        ax1 = axes[0, 0]
+        for load_type in self.simulation_results['load_type'].unique():
+            data = self.simulation_results[self.simulation_results['load_type'] == load_type]
+            ax1.plot(data['years'], data['igbt_remaining_life'], 'o-', 
+                    label=f'IGBT-{load_type}', linewidth=2, markersize=8)
+            ax1.plot(data['years'], data['capacitor_remaining_life'], 's--', 
+                    label=f'电容-{load_type}', linewidth=2, markersize=8)
+        format_axis_labels(ax1, '运行年数', '剩余寿命 (%)', 'IGBT和电容剩余寿命趋势')
+        add_grid(ax1, alpha=0.3)
+        ax1.legend(fontsize=10, loc='upper right', bbox_to_anchor=(1.0, 1.0))
+        set_adaptive_ylim(ax1, np.concatenate([
+            self.simulation_results['igbt_remaining_life'], 
+            self.simulation_results['capacitor_remaining_life']
+        ]))
+        
+        # 2. 温度分析
+        ax2 = axes[0, 1]
+        for load_type in self.simulation_results['load_type'].unique():
+            data = self.simulation_results[self.simulation_results['load_type'] == load_type]
+            ax2.plot(data['years'], data['avg_igbt_temp'], 'o-', 
+                    label=f'IGBT-{load_type}', linewidth=2, markersize=8)
+        format_axis_labels(ax2, '运行年数', '平均温度 (°C)', 'IGBT平均工作温度')
+        add_grid(ax2, alpha=0.3)
+        ax2.legend(fontsize=10, loc='upper right', bbox_to_anchor=(1.0, 1.0))
+        set_adaptive_ylim(ax2, self.simulation_results['avg_igbt_temp'])
+        
+        # 3. 寿命消耗率
+        ax3 = axes[0, 2]
+        for load_type in self.simulation_results['load_type'].unique():
+            data = self.simulation_results[self.simulation_results['load_type'] == load_type]
+            ax3.plot(data['years'], data['igbt_life_consumption']*100, 'o-', 
+                    label=f'{load_type}负载', linewidth=2, markersize=8)
+        format_axis_labels(ax3, '运行年数', '寿命消耗率 (%)', 'IGBT寿命消耗率')
+        add_grid(ax3, alpha=0.3)
+        ax3.legend(fontsize=10, loc='upper right', bbox_to_anchor=(1.0, 1.0))
+        set_adaptive_ylim(ax3, self.simulation_results['igbt_life_consumption']*100)
+        
+        # 4. 10年预测热力图
+        ax4 = axes[1, 0]
+        ten_year_data = self.simulation_results[self.simulation_results['years'] == 10]
+        load_types = ten_year_data['load_type'].values
+        igbt_life = ten_year_data['igbt_remaining_life'].values
+        cap_life = ten_year_data['capacitor_remaining_life'].values
+        
+        x = np.arange(len(load_types))
+        width = 0.35
+        
+        bars1 = ax4.bar(x - width/2, igbt_life, width, label='IGBT剩余寿命', alpha=0.8)
+        bars2 = ax4.bar(x + width/2, cap_life, width, label='电容剩余寿命', alpha=0.8)
+        
+        format_axis_labels(ax4, '负载类型', '剩余寿命 (%)', '10年运行后剩余寿命对比')
+        ax4.set_xticks(x)
+        ax4.set_xticklabels(load_types, rotation=45, ha='right', fontsize=10)
+        ax4.legend(fontsize=10, loc='upper right', bbox_to_anchor=(1.0, 1.0))
+        add_grid(ax4, alpha=0.3)
+        
+        # 添加数值标签，避免重叠，增加标签间距
+        for bar in bars1:
+            height = bar.get_height()
+            ax4.text(bar.get_x() + bar.get_width()/2., height + 2,
+                    f'{height:.1f}%', ha='center', va='bottom', fontsize=9, fontweight='bold')
+        
+        for bar in bars2:
+            height = bar.get_height()
+            ax4.text(bar.get_x() + bar.get_width()/2., height + 2,
+                    f'{height:.1f}%', ha='center', va='bottom', fontsize=9, fontweight='bold')
+        
+        # 5. 温度分布
+        ax5 = axes[1, 1]
+        all_temps = []
+        all_loads = []
+        for _, row in self.simulation_results.iterrows():
+            all_temps.extend([row['avg_igbt_temp'], row['max_igbt_temp']])
+            all_loads.extend([f"{row['load_type']}-平均", f"{row['load_type']}-最高"])
+        
+        ax5.bar(range(len(all_temps)), all_temps, alpha=0.7)
+        format_axis_labels(ax5, '工况', '温度 (°C)', 'IGBT温度分布')
+        ax5.set_xticks(range(len(all_temps)))
+        ax5.set_xticklabels(all_loads, rotation=45, ha='right', fontsize=9)
+        add_grid(ax5, alpha=0.3)
+        set_adaptive_ylim(ax5, all_temps)
+        
+        # 6. 寿命预测曲线
+        ax6 = axes[1, 2]
+        years_extended = np.arange(1, 16)  # 扩展到15年
+        
+        for load_type in self.simulation_results['load_type'].unique():
+            data = self.simulation_results[self.simulation_results['load_type'] == load_type]
+            # 简单线性外推
+            if len(data) >= 2:
+                slope = (data['igbt_remaining_life'].iloc[-1] - data['igbt_remaining_life'].iloc[0]) / (data['years'].iloc[-1] - data['years'].iloc[0])
+                predicted_life = data['igbt_remaining_life'].iloc[0] + slope * (years_extended - data['years'].iloc[0])
+                predicted_life = np.maximum(predicted_life, 0)  # 不低于0
+                
+                ax6.plot(years_extended, predicted_life, '--', label=f'{load_type}负载预测', linewidth=2)
+                ax6.plot(data['years'], data['igbt_remaining_life'], 'o-', linewidth=2, markersize=6)
+        
+        format_axis_labels(ax6, '运行年数', 'IGBT剩余寿命 (%)', 'IGBT寿命预测曲线')
+        add_grid(ax6, alpha=0.3)
+        ax6.legend(fontsize=10, loc='upper right', bbox_to_anchor=(1.0, 1.0))
+        set_adaptive_ylim(ax6, [0, 100])  # 寿命百分比范围
+        
+        # 7. 负载影响分析
+        ax7 = axes[2, 0]
+        load_impact = []
+        load_labels = []
+        
+        for load_type in self.simulation_results['load_type'].unique():
+            data = self.simulation_results[self.simulation_results['load_type'] == load_type]
+            ten_year_life = data[data['years'] == 10]['igbt_remaining_life'].iloc[0]
+            load_impact.append(ten_year_life)
+            load_labels.append(load_type)
+        
+        colors = ['lightcoral', 'lightblue', 'lightgreen']
+        wedges, texts, autotexts = ax7.pie(load_impact, labels=load_labels, autopct='%1.1f%%', colors=colors)
+        ax7.set_title('10年后IGBT剩余寿命分布', fontsize=12, pad=15, fontweight='bold')
+        
+        # 设置饼图文字大小，避免重叠
+        for autotext in autotexts:
+            autotext.set_fontsize(10)
+            autotext.set_fontweight('bold')
+        for text in texts:
+            text.set_fontsize(10)
+        
+        # 8. 维护优先级矩阵
+        ax8 = axes[2, 1]
+        maintenance_priority = []
+        priority_labels = []
+        
+        for _, row in self.simulation_results.iterrows():
+            if row['years'] in [5, 10]:  # 重点关注5年和10年
+                life = row['igbt_remaining_life']
+                if life < 50:
+                    priority = '高'
+                elif life < 80:
+                    priority = '中'
+                else:
+                    priority = '低'
+                
+                maintenance_priority.append(priority)
+                priority_labels.append(f"{row['years']}年-{row['load_type']}")
+        
+        priority_counts = pd.Series(maintenance_priority).value_counts()
+        bars = ax8.bar(priority_counts.index, priority_counts.values, color=['red', 'orange', 'green'])
+        format_axis_labels(ax8, '维护优先级', '工况数量', '维护优先级分布')
+        add_grid(ax8, alpha=0.3)
+        
+        # 添加数值标签，增加间距避免重叠
+        for bar in bars:
+            height = bar.get_height()
+            ax8.text(bar.get_x() + bar.get_width()/2., height + 0.2,
+                    f'{int(height)}', ha='center', va='bottom', fontsize=10, fontweight='bold')
+        
+        # 9. 综合评估
+        ax9 = axes[2, 2]
+        # 计算综合评分（考虑寿命、温度、负载等因素）
+        scores = []
+        score_labels = []
+        
+        for _, row in self.simulation_results.iterrows():
+            if row['years'] == 10:  # 只评估10年情况
+                life_score = row['igbt_remaining_life'] / 100
+                temp_score = max(0, 1 - (row['avg_igbt_temp'] - 100) / 200)  # 温度评分
+                load_factor = {'light': 1.0, 'medium': 0.8, 'heavy': 0.6}[row['load_type']]
+                
+                total_score = (life_score * 0.6 + temp_score * 0.3 + load_factor * 0.1) * 100
+                scores.append(total_score)
+                score_labels.append(row['load_type'])
+        
+        bars = ax9.bar(score_labels, scores, color=['lightcoral', 'lightblue', 'lightgreen'])
+        format_axis_labels(ax9, '负载类型', '综合评分', '10年运行综合评估')
+        add_grid(ax9, alpha=0.3)
+        
+        # 添加数值标签，增加间距避免重叠
+        for i, score in enumerate(scores):
+            ax9.text(i, score + 2, f'{score:.1f}', ha='center', va='bottom', fontsize=10, fontweight='bold')
+        
+        # 优化布局，避免重叠
+        plt.tight_layout()
+        
+        # 显示图形
+        finalize_plot(fig)
+    
+    def generate_comprehensive_report(self):
+        """生成综合分析报告"""
+        if self.simulation_results is None:
+            print("请先运行仿真获取数据")
+            return
+            
+        print("\n" + "=" * 80)
+        print("35kV/25MW级联储能PCS长期寿命综合分析报告")
+        print("=" * 80)
+        print(f"生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        # 分析寿命趋势
+        self.analyze_life_trends()
+        
+        # 计算维护计划
+        maintenance_df = self.calculate_maintenance_schedule()
+        
+        # 关键发现
+        print("\n" + "=" * 60)
+        print("关键发现与建议")
+        print("=" * 60)
+        
+        # 找出最关键的维护点
+        if maintenance_df is not None:
+            critical_maintenance = maintenance_df[maintenance_df['urgency'].isin(['紧急', '高'])]
+            if not critical_maintenance.empty:
+                print("需要重点关注的情况:")
+                for _, point in critical_maintenance.iterrows():
+                    print(f"  • {point['years']}年 {point['load_type']}负载: IGBT剩余寿命{point['igbt_life']:.1f}%")
+        
+        # 10年预测总结
+        ten_year_summary = self.simulation_results[self.simulation_results['years'] == 10]
+        print(f"\n10年运行预测总结:")
+        for _, row in ten_year_summary.iterrows():
+            status = "良好" if row['igbt_remaining_life'] > 80 else "需要关注" if row['igbt_remaining_life'] > 50 else "需要更换"
+            print(f"  • {row['load_type']}负载: IGBT剩余寿命{row['igbt_remaining_life']:.1f}% ({status})")
+        
+        # 维护策略建议
+        print(f"\n维护策略建议:")
+        print("  1. 建立分级维护体系:")
+        print("     • 轻负载工况: 5年检查一次")
+        print("     • 中等负载工况: 3年检查一次")
+        print("     • 重负载工况: 2年检查一次")
+        print("  2. 实施预测性维护:")
+        print("     • 实时监测IGBT结温")
+        print("     • 定期分析温度循环数据")
+        print("     • 建立寿命预测模型")
+        print("  3. 优化运行策略:")
+        print("     • 避免长期重负载运行")
+        print("     • 实施负载均衡")
+        print("     • 优化冷却系统")
+        
+        print("\n" + "=" * 80)
+    
+    def save_detailed_results(self):
+        """保存详细分析结果"""
+        if self.simulation_results is None:
+            print("请先运行仿真获取数据")
+            return None
+            
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'result/详细寿命分析报告_{timestamp}.csv'
+        
+        # 确保result目录存在
+        import os
+        os.makedirs('result', exist_ok=True)
+        
+        # 添加分析指标
+        detailed_results = self.simulation_results.copy()
+        detailed_results['年化寿命消耗率'] = detailed_results.groupby('load_type')['igbt_life_consumption'].diff() / detailed_results.groupby('load_type')['years'].diff()
+        detailed_results['维护优先级'] = detailed_results['igbt_remaining_life'].apply(
+            lambda x: '紧急' if x < 20 else '高' if x < 50 else '中' if x < 80 else '低'
+        )
+        detailed_results['运行状态'] = detailed_results['igbt_remaining_life'].apply(
+            lambda x: '需要更换' if x < 50 else '需要关注' if x < 80 else '良好'
+        )
+        
+        detailed_results.to_csv(filename, index=False, encoding='utf-8-sig')
+        print(f"详细分析结果已保存到: {filename}")
+        return filename
+
 def run_long_term_life_simulation():
     """运行长期寿命仿真"""
     print("开始长期寿命仿真分析...")
@@ -440,5 +826,45 @@ def run_long_term_life_simulation():
     
     return results, report
 
+def run_detailed_analysis():
+    """运行详细分析（兼容原有接口）"""
+    print("开始详细长期寿命分析...")
+    
+    # 创建仿真对象
+    simulator = LongTermLifeSimulation()
+    
+    # 运行仿真获取数据
+    years_list = [1, 3, 5, 10]
+    load_types = ['light', 'medium', 'heavy']
+    simulator.simulate_long_term_life(years_list, load_types)
+    
+    # 生成综合分析报告
+    simulator.generate_comprehensive_report()
+    
+    # 绘制详细分析图表
+    print("\n生成详细分析图表...")
+    simulator.plot_detailed_analysis()
+    
+    # 保存详细结果
+    filename = simulator.save_detailed_results()
+    
+    print(f"\n详细分析完成！")
+    print(f"分析结果已保存到: {filename}")
+    
+    return simulator
+
 if __name__ == "__main__":
-    run_long_term_life_simulation() 
+    # 可以选择运行基础仿真或详细分析
+    print("选择运行模式:")
+    print("1. 基础长期寿命仿真")
+    print("2. 详细寿命分析")
+    
+    choice = input("请输入选择 (1 或 2): ").strip()
+    
+    if choice == "1":
+        run_long_term_life_simulation()
+    elif choice == "2":
+        run_detailed_analysis()
+    else:
+        print("默认运行详细寿命分析...")
+        run_detailed_analysis() 

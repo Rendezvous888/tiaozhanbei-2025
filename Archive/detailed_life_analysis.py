@@ -22,7 +22,7 @@ class DetailedLifeAnalysis:
     
     def __init__(self):
         # 从之前的仿真结果加载数据
-        self.results_file = 'result/长期寿命分析结果_20250801_113525.csv'
+        self.results_file = 'result/长期寿命分析结果_20250814_114021.csv'
         self.results = pd.read_csv(self.results_file)
         
         # 设置中文字体
