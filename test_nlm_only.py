@@ -178,3 +178,4 @@ if __name__ == "__main__":
         print(f"\n🎉 NLM调制策略测试成功！THD性能满足要求。")
     else:
         print(f"\n⚠️  NLM调制策略需要进一步优化以降低THD。")
+

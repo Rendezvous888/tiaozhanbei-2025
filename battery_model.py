@@ -28,7 +28,15 @@ from scipy.io import loadmat
 
 KELVIN_OFFSET: float = 273.15
 
-ocv_data = loadmat('ocv_data.mat')
+# 获取当前文件所在目录，确保能正确找到 ocv_data.mat 文件
+current_dir = os.path.dirname(os.path.abspath(__file__))
+ocv_data_path = os.path.join(current_dir, 'ocv_data.mat')
+
+# 检查文件是否存在
+if not os.path.exists(ocv_data_path):
+    raise FileNotFoundError(f"找不到文件: {ocv_data_path}")
+
+ocv_data = loadmat(ocv_data_path)
 soc_lut = np.linspace(0, 1, 201)
 soc_lut = soc_lut.reshape(-1, 1)
 OCV0 = ocv_data['OCV0'][0]
