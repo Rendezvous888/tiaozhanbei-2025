@@ -149,6 +149,8 @@ def plot_she_vs_spwm(t, V_she, V_spwm, modulation_index, angles):
     finalize_plot(fig, 'SHE-PWM vs SPWM Analysis')
     
     # 保存图片
+    import os
+    os.makedirs('result', exist_ok=True)
     plt.savefig('result/she_pwm_analysis.png', dpi=300, bbox_inches='tight')
     print("\nSHE-PWM分析结果已保存到: result/she_pwm_analysis.png")
 
@@ -182,6 +184,8 @@ def test_cascaded_she_system():
     print(f"- THD: {thd:.2f}%")
     print(f"- 输出电压范围: [{np.min(V_total):.1f}, {np.max(V_total):.1f}] V")
     
+    # 计算频谱用于可视化
+    freqs, magnitude = cascaded_she.calculate_harmonic_spectrum(V_total, t)
     # 绘制级联SHE结果
     plot_cascaded_she_results(t, V_total, V_modules, freqs, magnitude, cascaded_she)
     
@@ -256,6 +260,8 @@ def plot_cascaded_she_results(t, V_total, V_modules, freqs, magnitude, system):
     finalize_plot(fig, 'Cascaded SHE-PWM System Analysis')
     
     # 保存图片
+    import os
+    os.makedirs('result', exist_ok=True)
     plt.savefig('result/cascaded_she_analysis.png', dpi=300, bbox_inches='tight')
     print("\n级联SHE-PWM分析结果已保存到: result/cascaded_she_analysis.png")
 

@@ -222,6 +222,8 @@ def plot_optimization_results(t, results, modulation_indices, harmonic_orders_li
     finalize_plot(fig, '35kV System SHE-PWM Optimization')
     
     # 保存图片
+    import os
+    os.makedirs('result', exist_ok=True)
     plt.savefig('result/35kv_she_optimization.png', dpi=300, bbox_inches='tight')
     print("\n优化结果已保存到: result/35kv_she_optimization.png")
 

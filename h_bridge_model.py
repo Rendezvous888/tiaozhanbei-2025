@@ -186,22 +186,29 @@ class CascadedHBridgeSystem:
         L = np.round(self.N_modules * v_ref_norm).astype(int)  # 目标电平（模块数）
         L = np.clip(L, -self.N_modules, self.N_modules)
         
-        # 为每个模块生成输出
-        V_modules = [np.zeros_like(t) for _ in range(self.N_modules)]
-        for idx_time in range(len(t)):
-            level = L[idx_time]
-            if level > 0:
-                # 使前 level 个模块输出 +Vdc
-                for k in range(level):
-                    V_modules[k][idx_time] = +self.Vdc_per_module
-            elif level < 0:
-                # 使前 |level| 个模块输出 -Vdc
-                for k in range(-level):
-                    V_modules[k][idx_time] = -self.Vdc_per_module
-            # 其余模块保持为0
+        # 为每个模块生成输出（向量化实现，显著加速）
+        num_samples = len(t)
+        V_modules = np.zeros((self.N_modules, num_samples), dtype=float)
+        # 正负电平分别处理
+        pos_levels = np.clip(L, 0, self.N_modules)
+        neg_levels = -np.clip(L, -self.N_modules, 0)
+        # 对于每个可能的级数，批量赋值
+        if np.any(pos_levels):
+            for k in range(1, self.N_modules + 1):
+                mask = pos_levels >= k
+                if not np.any(mask):
+                    continue
+                V_modules[k-1, mask] = self.Vdc_per_module
+        if np.any(neg_levels):
+            for k in range(1, self.N_modules + 1):
+                mask = neg_levels >= k
+                if not np.any(mask):
+                    continue
+                V_modules[k-1, mask] = -self.Vdc_per_module
         
         V_total = np.sum(V_modules, axis=0)
-        return V_total, V_modules
+        # 转回列表与原接口一致
+        return V_total, [V_modules[i, :] for i in range(self.N_modules)]
 
     def calculate_harmonic_spectrum(self, V_output, t):
         """计算谐波频谱（仅用于可视化）。不要用它直接算THD。"""

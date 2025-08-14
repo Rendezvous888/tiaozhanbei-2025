@@ -328,6 +328,8 @@ def plot_pwm_comparison(t, results, strategies, modulation_indices):
     finalize_plot(fig, 'Advanced PWM Strategies Comparison Results')
     
     # 保存图片
+    import os
+    os.makedirs('result', exist_ok=True)
     plt.savefig('result/advanced_pwm_comparison.png', dpi=300, bbox_inches='tight')
     print("\n比较结果已保存到: result/advanced_pwm_comparison.png")
 
