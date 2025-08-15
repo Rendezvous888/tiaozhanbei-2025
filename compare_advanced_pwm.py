@@ -100,7 +100,7 @@ class AdvancedPWMStrategies:
         return V_total, V_modules
     
     def _generate_svpwm_module(self, t, v_ref, module_index, modulation_index):
-        """生成单个模块的SVPWM输出（新实现）"""
+        """生成单个模块的SVPWM输出"""
         omega = 2 * np.pi * self.f_grid
         
         # SVPWM使用优化的开关序列来减少谐波
@@ -375,7 +375,7 @@ def generate_performance_report(results, strategies, modulation_indices):
     
     print("• PS-PWM: 适合高频开关，THD中等，开关损耗较高")
     print("• NLM: 开关频率低，THD较低，适合多电平系统")
-    print("• SVPWM: 选择性消除谐波，THD最低，但计算复杂")
+    print("• SVPWM: 基于空间矢量理论，THD较低，开关损耗适中")
 
 if __name__ == "__main__":
     # 运行比较分析

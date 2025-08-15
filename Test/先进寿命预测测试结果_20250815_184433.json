@@ -1,0 +1,19 @@
+{
+  "igbt": {
+    "test_completed": true
+  },
+  "capacitor": {
+    "test_completed": true
+  },
+  "ml_model": {
+    "test_completed": true
+  },
+  "integrated": {
+    "test_completed": true,
+    "recommendations_count": 5
+  },
+  "maintenance": {
+    "economics_roi": 0.6491879835734609,
+    "total_cost": 701557.1428571428
+  }
+}

@@ -16,8 +16,9 @@ class SystemParameters:
         # 全局时间步长（秒）
         self.time_step_seconds = 60
         
-        # 级联H桥配置（比赛方案口径）：每相级联模块数 40、模块开关频率 1000 Hz
-        self.cascaded_power_modules = 40
+        # 级联H桥配置（比赛方案口径）：按比赛方案要求每相40个H桥级联
+        # 注：严格按照比赛方案"每相H桥级联40个"的要求
+        self.cascaded_power_modules = 40  # 每相级联模块数（比赛方案要求）
         self.module_switching_frequency_Hz = 1000  # 模块开关频率 (Hz)
         self.rated_current_A = 420  # 额定电流 (A)
         self.overload_capability_pu = "3 pu / 10s"  # 过载能力
@@ -26,8 +27,8 @@ class SystemParameters:
         self.battery_capacity_Ah = 314  # 电池容量 (Ah)
         self.battery_series_cells = 312  # 串联电池数
         self.battery_note = "Ningde or other domestic/foreign suppliers"
-        # 目标系统能量（以小时计），用于推导并联倍数（建议2h，便于SOC有可见波动）
-        self.energy_hours = 2.0
+        # 目标系统能量（以小时计），用于推导并联倍数（恢复为2h系统，保持合理的储能容量）
+        self.energy_hours = 2.0  # 恢复为2小时系统
         # 额外系统损耗（辅助、滤波、变压等）按输出功率比例估计
         self.misc_loss_fraction = 0.03  # ~3%
         # 固定辅助损耗（风机、控制器等），W
@@ -39,7 +40,8 @@ class SystemParameters:
         
         # 冷却和环境参数
         self.water_cooling_inlet_temperature_C = 25  # 水冷入口温度 (°C)
-        self.ambient_temperature_C = [25, 30]  # 环境温度范围 (°C)
+        # 项目要求：环境工作温度20-40°C，设计验证需覆盖全范围
+        self.ambient_temperature_C = [20, 40]  # 环境温度范围 (°C) - 符合项目要求
         self.power_device = "1700V IGBT"  # 功率器件类型
 
 class IGBTParameters:

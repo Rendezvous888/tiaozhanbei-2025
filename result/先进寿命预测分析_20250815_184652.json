@@ -1,0 +1,18 @@
+{
+  "1": {
+    "igbt_final_prediction": 99.57270053775537,
+    "capacitor_final_prediction": 88.08258852211372
+  },
+  "3": {
+    "igbt_final_prediction": 99.56256263420241,
+    "capacitor_final_prediction": 87.26621965054973
+  },
+  "5": {
+    "igbt_final_prediction": 99.52249578228887,
+    "capacitor_final_prediction": 86.64983736759872
+  },
+  "10": {
+    "igbt_final_prediction": 99.45715238228053,
+    "capacitor_final_prediction": 86.43622480125437
+  }
+}
